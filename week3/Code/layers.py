@@ -80,8 +80,6 @@ for i in tqdm(range(len(optimizers))):
     model.add(Dense(units=1024, activation='relu',name='fourth'))
     model.add(Dense(units=512, activation='relu',name='fifth'))
     model.add(Dense(units=8, activation='softmax'))
-        
-    model.add(Dense(units=8, activation='softmax'))
     
     model.compile(loss='categorical_crossentropy',
                 optimizer=optimizers[i],
