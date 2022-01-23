@@ -54,3 +54,32 @@ def generate_image_patches_db(in_directory,out_directory,patch_size=64):
           patch = Image.fromarray(patch)
           patch.save(os.path.join(out_directory,split_dir,class_dir,imname.split(',')[0]+'_'+str(i)+'.jpg'))
   print('\n')
+
+def intersection_kernel(A,B):
+    """
+    Histogram intersection kernel function defined as:
+    K_int(A, B) = SUM_i(min(a_i, b_i))
+
+    Parameters
+    ---------
+    A: histogram
+    B: histogram
+
+    Return
+    ---------
+    k_int: kernel function
+    """
+
+    # Create the kernel parameter
+    k_int = np.zeros((A.shape[0], B.shape[0]))
+
+    # Shape of the histograms
+    size = A.shape[1]
+
+    # Iterate through bins
+    for idx in range(size):
+        bin_A = A[:, idx].reshape(-1,1)
+        bin_B = B[:, idx].reshape(-1,1)
+        k_int += np.minimum(bin_A, bin_B.T)
+
+    return k_int

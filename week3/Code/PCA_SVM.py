@@ -7,7 +7,6 @@ from keras import optimizers
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
-from scipy.misc import imresize
 import pickle
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
@@ -16,6 +15,8 @@ from sklearn.metrics import classification_report
 import os
 from sklearn.decomposition import PCA
 from tqdm import tqdm
+from utils import intersection_kernel
+from skimage.transform import resize
 
 #user defined variables
 f = open("env.txt", "r")
@@ -107,8 +108,8 @@ else:
     model.load_weights(MODEL_FNAME)
 
 print('Reading filenames')
-train_images_filenames = pickle.load(open(DATASET_DIR + '/train_images_filenames.dat', 'rb'))
-test_images_filenames = pickle.load(open(DATASET_DIR + '/test_images_filenames.dat', 'rb'))
+train_images_filenames = pickle.load(open('train_images_filenames.dat', 'rb'))
+test_images_filenames = pickle.load(open('test_images_filenames.dat', 'rb'))
 train_images_filenames = ['..' + n[15:] for n in train_images_filenames]
 test_images_filenames = ['..' + n[15:] for n in test_images_filenames]
 train_labels = pickle.load(open('train_labels.dat','rb'))
@@ -120,47 +121,38 @@ test_features = np.zeros((len(test_images_filenames),512),dtype=np.float32)
 
 # Train features
 print('Obtaining the train features...')
-for idx in tqdm(range(len(train_images_filenames))):
-    img = np.asarray(Image.open('../../../week2/' + train_images_filenames[idx][2:]))
-    img = np.expand_dims(imresize(img, (IMG_SIZE, IMG_SIZE, 3)), axis=0)
+for idx in range(len(train_images_filenames)):
+    img = np.asarray(Image.open(DATASET_DIR[:-10] + train_images_filenames[idx][2:]))
+    img = np.expand_dims(resize(img, (IMG_SIZE, IMG_SIZE, 3)), axis=0)
 
     model_layer = Model(inputs=model.input, outputs=model.get_layer('fourth').output)
     train_features[idx,:] = model_layer.predict(img)
     
 
 print('Obtaining the test features...')
-for idx in tqdm(range(len(test_images_filenames))):
-    img = np.asarray(Image.open('../../../week2/' + test_images_filenames[idx][2:]))
-    img = np.expand_dims(imresize(img, (IMG_SIZE, IMG_SIZE, 3)), axis=0)
+for idx in range(len(test_images_filenames)):
+    img = np.asarray(Image.open(DATASET_DIR[:-10] + test_images_filenames[idx][2:]))
+    img = np.expand_dims(resize(img, (IMG_SIZE, IMG_SIZE, 3)), axis=0)
 
     model_layer = Model(inputs=model.input, outputs=model.get_layer('fourth').output)
     test_features[idx,:] = model_layer.predict(img)
     
 
-param_grid = [{'kernel': ['rbf'], 'gamma': [1, 0.1, 0.01], 'C': [0.1, 1, 10]},
-              {'kernel': ['linear'], 'C': [0.1, 1, 10]},
-              {'kernel': ['poly'], 'degree': [2, 3, 4], 'gamma': [1, 0.1, 0.01], 'C': [0.1, 1, 10]}  
-             ]
+param_grid = [{'kernel': ['intersection_kernel']}]
 
 #PCA
-
-n_components = 2**np.arange(5,10)
-print(n_components)
-
-n_components_X_test = []  
-for i in tqdm(range(len(n_components))):
-    pca = PCA(n_components = n_components[i])
-    train_pca = pca.fit_transform(train_features)
-    test_pca = pca.transform(test_features)
+pca = PCA(n_components = 30)
+train_pca = pca.fit_transform(train_features)
+test_pca = pca.transform(test_features)
     
-    print(test_pca.shape)
-    print(train_pca.shape)
+print(test_pca.shape)
+print(train_pca.shape)
 
 
-    # SVM at first layer
-    print('SVM at FOURTH layer:')
-    grid = GridSearchCV(SVC(), param_grid, cv=5, scoring='accuracy')
-    grid.fit(train_pca, train_labels)
-    print("BEST PARAMS", grid.best_params_, grid.best_estimator_)
-    grid_predictions = grid.predict(test_pca)
-    print("classification_report\n", classification_report(test_labels, grid_predictions))
+# SVM at first layer
+print('SVM at FOURTH layer:')
+grid = GridSearchCV(SVC(), param_grid, cv=5, scoring='accuracy')
+grid.fit(train_pca, train_labels)
+print("BEST PARAMS", grid.best_params_, grid.best_estimator_)
+grid_predictions = grid.predict(test_pca)
+print("classification_report\n", classification_report(test_labels, grid_predictions))
