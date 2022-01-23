@@ -11,6 +11,7 @@ from PIL import Image
 import numpy as np
 from scipy.misc import imresize
 from tqdm import tqdm
+from keras import optimizers
 
 f = open("env.txt", "r")
 ENV = f.read().split('"')[1]
@@ -69,63 +70,103 @@ val_loss = []
 
 init_unit = 4096
 
-optimizers = ['sgd','rmsprop','adam','adagrad']
 
-for i in tqdm(range(len(optimizers))):
-    model = Sequential()
+optimizers_names = ['Adagrad']
+optimizer = optimizers.Adagrad(lr=1e-3)
+""" optimizers_ = [optimizers.Adagrad(lr=1e-3),optimizers.RMSprop(lr=1e-4),optimizers.SGD(lr=1e-2),optimizers.Adam(lr=1e-3),optimizers.Adadelta(lr=1e-2),
+               optimizers.Adamax(lr=1e-3),optimizers.Nadam(lr=1e-4)] """
+
+model = Sequential()
+   
+model.add(Reshape((IMG_SIZE * IMG_SIZE * 3,), input_shape=(IMG_SIZE, IMG_SIZE, 3), name='first'))
+model.add(Dense(units=4096, activation='relu',name='second'))
+model.add(Dense(units=2048, activation='relu',name='third'))
+model.add(Dense(units=1024, activation='relu',name='fourth'))
+model.add(Dense(units=512, activation='relu',name='fifth'))
+model.add(Dense(units=8, activation='softmax'))
+model.compile(loss='categorical_crossentropy',
+            optimizer=optimizer,
+            metrics=['accuracy'])
+
+print(model.summary())
+
+print('Done!\n')
+
+if os.path.exists(MODEL_FNAME):
+    print('WARNING: model file ' + MODEL_FNAME + ' exists and will be overwritten!\n')
+
+print('Start training...\n')
+
+# this is the dataset configuration we will use for training
+# only rescaling
+
+history = model.fit_generator(
+    train_generator,
+    steps_per_epoch=1881 // BATCH_SIZE,
+    epochs=50,
+    validation_data=validation_generator,
+    validation_steps=807 // BATCH_SIZE)
+
+print('Done!\n')
+print('Saving the model into ' + MODEL_FNAME + ' \n')
+model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
+print('Done!\n')
+
+# summarize history for accuracy
+acc.append(history.history['acc'])
+val_acc.append(history.history['val_acc'])
+
+loss.append(history.history['loss'])s
+val_loss.append(history.history['val_loss'])
+
+np.save('history_' + optimizers_names[i] + '.npy', history.history)
     
-    model.add(Reshape((IMG_SIZE * IMG_SIZE * 3,), input_shape=(IMG_SIZE, IMG_SIZE, 3), name='first'))
-    model.add(Dense(units=4096, activation='relu',name='second'))
-    model.add(Dense(units=2048, activation='relu',name='third'))
-    model.add(Dense(units=1024, activation='relu',name='fourth'))
-    model.add(Dense(units=512, activation='relu',name='fifth'))
-    model.add(Dense(units=8, activation='softmax'))
+""" optimizers_names = ['Adagrad','RMSprop','SGD','Adam','Adadelta','Adamax','Nadam']
+
+acc = []
+val_acc = []
+loss = []
+val_loss = []
+
+for optimizer in optimizers_names:
+    history = np.load('history_' + optimizer + '.npy')
+    acc.append(history.item().get('acc'))
+    val_acc.append(history.item().get('val_acc'))
+    loss.append(history.item().get('loss'))
+    val_loss.append(history.item().get('val_loss'))
     
-    model.compile(loss='categorical_crossentropy',
-                optimizer=optimizers[i],
-                metrics=['accuracy'])
 
-    print(model.summary())
-    plot_model(model, to_file='modelMLP.png', show_shapes=True, show_layer_names=True)
+plt.title('Best accuracies per optimizer')
+plt.ylabel('Accuracy')
+plt.xlabel('Optimizer')
 
-    print('Done!\n')
+max_acc = np.max(np.array(acc)[:,-5:],axis=1)
+max_val_acc = np.max(np.array(val_acc)[:,-5:],axis=1)
+X_axis = np.arange(len(optimizers_names))
 
-    if os.path.exists(MODEL_FNAME):
-        print('WARNING: model file ' + MODEL_FNAME + ' exists and will be overwritten!\n')
 
-    print('Start training...\n')
+plt.bar(X_axis - 0.2,max_acc,0.4, label='Train')
+plt.bar(X_axis + 0.2,max_val_acc,0.4, label='Test')
 
-    # this is the dataset configuration we will use for training
-    # only rescaling
+for i in range(len(max_acc)):
+    plt.text(X_axis[i] - 0.4, max_acc[i], str(np.round(max_acc[i],3)))
+    plt.text(X_axis[i], max_val_acc[i], str(np.round(max_val_acc[i],3)))
 
-    history = model.fit_generator(
-        train_generator,
-        steps_per_epoch=1881 // BATCH_SIZE,
-        epochs=50,
-        validation_data=validation_generator,
-        validation_steps=807 // BATCH_SIZE)
-
-    print('Done!\n')
-    print('Saving the model into ' + MODEL_FNAME + ' \n')
-    model.save_weights(MODEL_FNAME)  # always save your weights after training or during training
-    print('Done!\n')
-
-    # summarize history for accuracy
-    acc.append(history.history['acc'])
-    val_acc.append(history.history['val_acc'])
-    
-    loss.append(history.history['loss'])
-    val_loss.append(history.history['val_loss'])
-    
-    np.save('history_' + optimizers[i] + '.npy', history.history)
+  
+  
+plt.xticks(X_axis, optimizers_names)
+plt.legend(loc='lower right')
+plt.savefig('accuracy_per_optimizer.jpg')
+plt.close() """
  
-plt.title('model accuracy')
+""" plt.title('model accuracy')
 plt.ylabel('accuracy')
 plt.xlabel('epoch')
 legend = [] 
 for i in range(len(acc)):
+    print(i)
     plt.plot(acc[i])
-    legend.append(optimizers[i])
+    legend.append(optimizers_names[i])
     
 plt.legend(legend, loc='upper left')
 plt.savefig('accuracy_train.jpg')
@@ -137,51 +178,34 @@ plt.xlabel('epoch')
 legend = [] 
 for i in range(len(val_acc)):
     plt.plot(val_acc[i])
-    legend.append(optimizers[i])
+    legend.append(optimizers_names[i])
     
 plt.legend(legend, loc='upper left')
 plt.savefig('accuracy_test.jpg')
 plt.close()
 
 
-plt.title('model loss  (1 hidden)')
+plt.title('model losss')
 plt.ylabel('accuracy')
 plt.xlabel('epoch')
 legend = [] 
 for i in range(len(loss)):
     plt.plot(loss[i])
-    legend.append(optimizers[i])
+    legend.append(optimizers_names[i])
     
 plt.legend(legend, loc='upper left')
 plt.savefig('loss_train.jpg')
 plt.close()
 
-plt.title('model loss validation  (1 hidden)')
+plt.title('model loss validation')
 plt.ylabel('accuracy')
 plt.xlabel('epoch')
 legend = [] 
 for i in range(len(val_loss)):
     plt.plot(val_loss[i])
-    legend.append(optimizers[i])
+    legend.append(optimizers_names[i])
     
 plt.legend(legend, loc='upper left')
 plt.savefig('loss_test.jpg')
-plt.close()
-    
-    
-""" plt.plot(history.history['val_acc'])
-plt.title('model accuracy (1 hidden)')
-plt.ylabel('accuracy')
-plt.xlabel('epoch')
-plt.legend(['train', 'validation'], loc='upper left')
-plt.savefig('accuracy_' + layer_size + '.jpg')
-plt.close()
-# summarize history for loss
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'validation'], loc='upper left')
-plt.savefig('loss_' + layer_size + '.jpg') """
+plt.close() """
 
